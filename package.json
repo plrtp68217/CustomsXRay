@@ -1,0 +1,30 @@
+{
+  "name": "customs-xray",
+  "version": "1.0.0",
+  "description": "Таможня: Рентген-Контроль — мультиплеерная 1v1 веб-игра на Socket.IO",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "smoke": "node test_flow.js",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed"
+  },
+  "keywords": [
+    "game",
+    "socket.io",
+    "multiplayer",
+    "customs",
+    "xray"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
+    "socket.io-client": "^4.7.5"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.0"
+  }
+}

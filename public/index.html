@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Таможня: Рентген-Контроль</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- ───────────── Шапка ───────────── -->
+  <header class="topbar">
+    <div class="logo">
+      <span class="logo-icon">▣</span>
+      <span class="logo-text">ТАМОЖНЯ<span class="accent">:РЕНТГЕН</span></span>
+    </div>
+    <div class="topbar-right">
+      <div id="roomBadge" class="room-badge hidden">КОМНАТА: <span id="roomCode">—</span></div>
+      <button id="soundToggle" class="icon-btn" title="Звук">🔊</button>
+    </div>
+  </header>
+
+  <!-- ───────────── Экраны (SPA) ───────────── -->
+  <main id="app">
+
+    <!-- Меню -->
+    <section id="screen-menu" class="screen active">
+      <div class="card">
+        <h1 class="title">Таможня: Рентген-Контроль</h1>
+        <p class="subtitle">Контрабандист против Таможенника. 1 на 1 в реальном времени.</p>
+
+        <div class="menu-grid">
+          <button id="btnCreate" class="btn btn-primary">Создать комнату</button>
+          <button id="btnJoin" class="btn btn-secondary">Войти по коду</button>
+        </div>
+
+        <div id="joinForm" class="join-form hidden">
+          <input id="inputRoomId" class="input" maxlength="5" placeholder="КОД КОМНАТЫ" autocomplete="off" />
+          <input id="inputNameJoin" class="input" maxlength="24" placeholder="Ваше имя" autocomplete="off" />
+          <button id="btnJoinConfirm" class="btn btn-primary">Подключиться</button>
+          <p id="joinError" class="error-text hidden"></p>
+        </div>
+
+        <input id="inputNameCreate" class="input name-input hidden" maxlength="24" placeholder="Ваше имя" autocomplete="off" />
+
+        <div class="rules">
+          <h3>Правила</h3>
+          <ul>
+            <li>3 раунда, роли меняются.</li>
+            <li><b>Укладка (30с):</b> спрячь контрабанду внутрь легального предмета, совместив силуэты.</li>
+            <li><b>Рентген (30с):</b> найди контрабанду на ленте сканером.</li>
+            <li>Контрабандист +1, если не нашли. Таможенник +1 за находку, −1 за ошибку.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Лобби -->
+    <section id="screen-lobby" class="screen">
+      <div class="card">
+        <h2 class="title">Лобби</h2>
+        <div class="lobby-code">
+          <span class="lobby-label">Код комнаты:</span>
+          <span id="lobbyCode" class="code-display">—</span>
+          <button id="btnCopy" class="btn btn-ghost">Копировать</button>
+        </div>
+        <div class="players">
+          <div class="player-slot" id="slotHost">
+            <div class="player-tag">Хост</div>
+            <div class="player-name" id="hostName">—</div>
+            <div class="player-status" id="hostStatus">●</div>
+          </div>
+          <div class="vs">VS</div>
+          <div class="player-slot" id="slotGuest">
+            <div class="player-tag">Гость</div>
+            <div class="player-name" id="guestName">Ожидание…</div>
+            <div class="player-status" id="guestStatus">○</div>
+          </div>
+        </div>
+        <button id="btnStart" class="btn btn-primary hidden">Старт</button>
+        <button id="btnLeaveLobby" class="btn btn-ghost">Выйти</button>
+      </div>
+    </section>
+
+    <!-- Игра: укладка (контрабандист) -->
+    <section id="screen-hide" class="screen">
+      <div class="game-wrap">
+        <div class="hud">
+          <div class="hud-left">
+            <span class="hud-role" id="hideRole">Контрабандист</span>
+            <span class="hud-round" id="hideRound">Раунд 1/3</span>
+          </div>
+          <div class="hud-center">
+            <div class="timer" id="hideTimer">30</div>
+          </div>
+          <div class="hud-right">
+            <div class="match-meter">
+              <span class="match-label">Совпадение:</span>
+              <div class="match-bar"><div class="match-fill" id="matchFill"></div></div>
+              <span class="match-value" id="matchValue">0%</span>
+            </div>
+          </div>
+        </div>
+        <div class="canvas-stage">
+          <canvas id="hideCanvas"></canvas>
+        </div>
+        <div class="game-controls">
+          <button id="btnRotate" class="btn btn-secondary">↻ Поворот</button>
+          <button id="btnReady" class="btn btn-primary">Готово!</button>
+          <p class="hint">Перетаскивай красный силуэт на полость внутри предмета. Ручку ↻ на силуэте тяни влево/вправо для поворота. Совмести контуры ≥85%.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Игра: укладка — ожидание таможенника -->
+    <section id="screen-hide-wait" class="screen">
+      <div class="card">
+        <h2 class="title">Таможенник</h2>
+        <p class="subtitle">Контрабандист прячет товар…</p>
+        <div class="scanner-loader"></div>
+        <div class="timer big" id="hideWaitTimer">30</div>
+      </div>
+    </section>
+
+    <!-- Игра: рентген -->
+    <section id="screen-scan" class="screen">
+      <div class="game-wrap">
+        <div class="hud">
+          <div class="hud-left">
+            <span class="hud-role" id="scanRole">Таможенник</span>
+            <span class="hud-round" id="scanRound">Раунд 1/3</span>
+          </div>
+          <div class="hud-center">
+            <div class="timer" id="scanTimer">30</div>
+          </div>
+          <div class="hud-right">
+            <span class="hud-status" id="scanStatus">Сканируй предметы</span>
+          </div>
+        </div>
+        <div class="canvas-stage" id="scanStage">
+          <canvas id="scanCanvas"></canvas>
+          <!-- Меню «Изъять» -->
+          <div id="seizeMenu" class="seize-menu hidden">
+            <button id="btnSeize" class="btn btn-danger">✋ Изъять</button>
+            <button id="btnCancelSeize" class="btn btn-ghost">Отмена</button>
+          </div>
+        </div>
+        <div class="game-controls">
+          <p class="hint" id="scanHint">Наведи курсор на предмет для рентгена. Кликни → «Изъять», если видишь контрабанду.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Результат раунда -->
+    <section id="screen-round-result" class="screen">
+      <div class="card">
+        <h2 class="title" id="resultTitle">Раунд завершён</h2>
+        <div class="result-row" id="resultContrabandist">
+          <span class="result-role">Контрабандист</span>
+          <span class="result-delta" id="contraDelta">+0</span>
+        </div>
+        <div class="result-row" id="resultCustoms">
+          <span class="result-role">Таможенник</span>
+          <span class="result-delta" id="customsDelta">+0</span>
+        </div>
+        <div class="result-detail" id="resultDetail"></div>
+        <div class="scores-mini" id="resultScores"></div>
+      </div>
+    </section>
+
+    <!-- Финал -->
+    <section id="screen-game-over" class="screen">
+      <div class="card">
+        <h2 class="title">Игра окончена</h2>
+        <div class="winner-box" id="winnerBox"></div>
+        <div class="final-scores" id="finalScores"></div>
+        <div class="final-history" id="finalHistory"></div>
+        <button id="btnBackMenu" class="btn btn-primary">В меню</button>
+      </div>
+    </section>
+
+    <!-- Disconnect-уведомление -->
+    <div id="overlay" class="overlay hidden">
+      <div class="overlay-card">
+        <h2 id="overlayTitle">Сообщение</h2>
+        <p id="overlayText"></p>
+        <button id="btnOverlayClose" class="btn btn-primary">ОК</button>
+      </div>
+    </div>
+
+    <!-- Тосты ошибок -->
+    <div id="toast" class="toast hidden"></div>
+  </main>
+
+  <!-- ───────────── Скрипты ───────────── -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="js/geometry.js"></script>
+  <script src="js/items.js"></script>
+  <script src="js/audio.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+# Зависимости
+node_modules/
+
+# Логи и временные файлы
+*.log
+server.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+/blob-report/
+/playwright-tmp/
+
+# ОС / редакторы
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Окружение
+.env
+.env.local
