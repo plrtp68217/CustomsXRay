@@ -1,106 +1,65 @@
 /**
- * items.js — shared-модуль определений предметов (Node + браузер).
+ * items.js — shared-модуль данных для сценария «Таможня: Досмотр машины».
  *
- * Структура предмета:
- * {
- *   id, legalName, contrabandName,
- *   legal:   [[x,y],...] — силуэт легального предмета (локальные координаты, центр ~ 0,0)
- *   contraband: [[x,y],...] — силуэт контрабанды (локальные, центр ~ 0,0)
- *   cavity:  { dx, dy, rot } — куда внутри легального предмета встроена полость
- *                             (форма полости == contraband, повёрнутая/сдвинутая)
- * }
+ * LEGAL_GOODS — легальные товары (форма + вес).
+ * CONTRABAND  — виды контрабанды (форма + вес).
+ * CAR_SLOTS   — 6 слотов груза в машине (2 ряда × 3 колонки).
+ *               row 0 = передний (виднее на рентгене, перекрывает задний),
+ *               row 1 = задний (перекрыт передним).
+ * CAR_BODY    — силуэт машины (вид сбоку) для отрисовки.
  *
- * Полость (пустое место внутри легального предмета) имеет ТУ ЖЕ форму, что и контрабанда.
- * Контрабандист должен совместить свой силуэт с полостью.
+ * Форма — полигон [x,y] в локальных координатах (центр ~ 0,0).
  */
 (function (root) {
   'use strict';
 
-  // Helper: прямоугольник вокруг центра
   function rect(w, h) {
     return [[-w / 2, -h / 2], [w / 2, -h / 2], [w / 2, h / 2], [-w / 2, h / 2]];
   }
 
-  const ITEMS = [
-    {
-      id: 'laptop',
-      legalName: 'Ноутбук',
-      contrabandName: 'Пистолет',
-      // корпус ноутбука
-      legal: rect(220, 150),
-      // пистолет — L-образный силуэт (ствол + рукоять)
-      contraband: [
-        [-45, -18], [25, -18], [25, -8], [45, -8],
-        [45, 4], [25, 4], [25, 28], [-10, 28],
-        [-10, 18], [-45, 18]
-      ],
-      cavity: { dx: 10, dy: 0, rot: 0 }
-    },
-    {
-      id: 'phen',
-      legalName: 'Фен',
-      contrabandName: 'Бриллиантовое кольцо',
-      // фен: корпус + труба
-      legal: [
-        [-90, -30], [40, -30], [60, -10], [60, 30],
-        [-90, 30]
-      ],
-      // «бриллиант» — ромб
-      contraband: [[0, -22], [18, 0], [0, 22], [-18, 0]],
-      cavity: { dx: -20, dy: 0, rot: 0 }
-    },
-    {
-      id: 'water',
-      legalName: 'Бутылка воды',
-      contrabandName: 'Флешка с данными',
-      // бутылка: горлышко + тулово
-      legal: [
-        [-15, -70], [15, -70], [15, -45], [35, -35],
-        [35, 55], [-35, 55], [-35, -35], [-15, -45]
-      ],
-      // флешка — маленький прямоугольник
-      contraband: rect(40, 18),
-      cavity: { dx: 0, dy: 20, rot: 0 }
-    },
-    {
-      id: 'teddy',
-      legalName: 'Игрушечный мишка',
-      contrabandName: 'Пачка наличных',
-      // мишка: голова + тело + уши (упрощённо)
-      legal: [
-        [-40, -40], [-40, -70], [-20, -70], [-20, -55],
-        [20, -55], [20, -70], [40, -70], [40, -40],
-        [60, -20], [60, 45], [-60, 45], [-60, -20]
-      ],
-      // пачка наличных — прямоугольник
-      contraband: rect(60, 36),
-      cavity: { dx: 0, dy: 5, rot: 0 }
-    },
-    {
-      id: 'speaker',
-      legalName: 'Колонка',
-      contrabandName: 'Пистолет',
-      // прямоугольная колонка
-      legal: rect(150, 180),
-      contraband: [
-        [-35, -18], [25, -18], [25, -8], [45, -8],
-        [45, 4], [25, 4], [25, 28], [-5, 28],
-        [-5, 18], [-35, 18]
-      ],
-      cavity: { dx: -15, dy: 30, rot: 0.4 }
-    },
-    {
-      id: 'box',
-      legalName: 'Коробка',
-      contrabandName: 'Слиток золота',
-      // коробка
-      legal: rect(180, 180),
-      // слиток — трапеция
-      contraband: [[-40, -20], [40, -20], [32, 20], [-32, 20]],
-      cavity: { dx: 20, dy: -25, rot: 0.25 }
-    }
+  const LEGAL_GOODS = [
+    { id: 'box',         name: 'Коробка',     shape: rect(70, 70), weight: 25 },
+    { id: 'crate',       name: 'Ящик',        shape: rect(95, 80), weight: 55 },
+    { id: 'suit',        name: 'Чемодан',     shape: rect(80, 55), weight: 18 },
+    { id: 'electronics', name: 'Электроника', shape: rect(70, 45), weight: 14 },
+    { id: 'food',        name: 'Продукты',    shape: rect(65, 65), weight: 20 },
+    { id: 'clothes',     name: 'Одежда',      shape: rect(75, 40), weight: 7  },
+    { id: 'tools',       name: 'Инструменты', shape: rect(90, 50), weight: 38 },
+    { id: 'books',       name: 'Книги',       shape: rect(60, 55), weight: 28 }
   ];
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = ITEMS;
-  else root.ITEMS = ITEMS;
+  const CONTRABAND = [
+    { id: 'pistol', name: 'Пистолет',  weight: 10, shape: [
+        [-40, -16], [22, -16], [22, -6], [40, -6],
+        [40, 6], [22, 6], [22, 26], [-8, 26],
+        [-8, 16], [-40, 16] ] },
+    { id: 'drugs',  name: 'Наркотики', weight: 4,  shape: rect(55, 40) },
+    { id: 'cash',   name: 'Наличные',  weight: 2,  shape: rect(60, 35) },
+    { id: 'gold',   name: 'Золото',    weight: 40, shape: [[-35, -18], [35, -18], [28, 18], [-28, 18]] }
+  ];
+
+  // Слоты груза в кузове (центр машины ~ 0,0).
+  const CAR_SLOTS = [
+    { slot: 0, col: 0, row: 0, x: -135, y:  22 },
+    { slot: 1, col: 1, row: 0, x:    0, y:  22 },
+    { slot: 2, col: 2, row: 0, x:  135, y:  22 },
+    { slot: 3, col: 0, row: 1, x: -135, y: -22 },
+    { slot: 4, col: 1, row: 1, x:    0, y: -22 },
+    { slot: 5, col: 2, row: 1, x:  135, y: -22 }
+  ];
+
+  // Силуэт машины (грузовой фургон, вид сбоку).
+  const CAR_BODY = [
+    [-220, -78], [ 220, -78], [ 220,  60], [ 160,  60], [ 160,  30],
+    [ 150, -95], [  60,-100], [  20,-105], [- 60,-105], [- 80,-100],
+    [-150, -95], [-160,  30], [-220,  60]
+  ];
+
+  function goodById(id) { return LEGAL_GOODS.find(g => g.id === id); }
+  function contrabandById(id) { return CONTRABAND.find(c => c.id === id); }
+
+  const API = { LEGAL_GOODS, CONTRABAND, CAR_SLOTS, CAR_BODY, goodById, contrabandById, rect };
+
+  if (typeof module !== 'undefined' && module.exports) module.exports = API;
+  else root.Cargo = API;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

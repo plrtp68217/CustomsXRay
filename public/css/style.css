@@ -313,3 +313,26 @@ canvas { display: block; touch-action: none; position: absolute; inset: 0; width
   .timer { font-size: 22px; }
   .canvas-stage { min-height: 240px; }
 }
+/* ───────────── Досмотр: инструменты ───────────── */
+.tool-count { display: flex; gap: 10px; font-family: var(--mono); font-size: 12px; color: var(--text-dim); }
+.cnt { display: inline-block; min-width: 18px; padding: 0 5px; margin-left: 4px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); color: var(--accent); font-size: 12px; }
+.btn:disabled .cnt { opacity: 0.4; }
+
+.info-panel {
+  background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 16px; font-family: var(--mono); font-size: 14px; color: var(--text);
+}
+.info-panel.log { max-height: 120px; overflow-y: auto; }
+.info-panel .weigh-row { display: flex; justify-content: space-between; gap: 14px; }
+.info-panel .weigh-row .neg { color: var(--danger); }
+.info-panel .weigh-row .pos { color: var(--good); }
+.info-panel .log-row { padding: 4px 0; border-bottom: 1px dashed var(--border); }
+.info-panel .log-row .stress-high { color: var(--danger); font-weight: 700; }
+.info-panel .log-row .stress-low { color: var(--good); }
+
+.seize-title { color: var(--accent); font-size: 13px; margin-bottom: 4px; text-align: center; letter-spacing: 1px; }
+
+.answer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+
+/* Маркер стресса на слоте рисуется на canvas; сюда — только раскладка досмотра */
+#inspectControls { gap: 10px; }

@@ -1,7 +1,7 @@
 /**
- * test_flow.js — end-to-end smoke-тест полного игрового цикла.
- * Запускать при уже работающем сервере (npm start) на :3000.
- * Симулирует хост + гость, 3 раунда, проверяет корректность событий и очков.
+ * test_flow.js — end-to-end smoke-тест нового сценария «Досмотр машины».
+ * Запускать при работающем сервере (npm start) на :3000.
+ * Симулирует хост + гость, 3 раунда, прогоняет инструменты досмотра.
  */
 const { io } = require('socket.io-client');
 
@@ -9,123 +9,97 @@ const URL = 'http://localhost:3000';
 const host = io(URL, { forceNew: true });
 const guest = io(URL, { forceNew: true });
 
-let hostRoom = null;
 const log = (...a) => console.log('[test]', ...a);
+const ep = (s, ev, p) => new Promise(r => s.emit(ev, p, a => r(a)));
 
-let hostGot = {}, guestGot = {};
-let hideCount = 0, scanCount = 0, resultsCount = 0;
-
-function emitP(sock, ev, payload) {
-  return new Promise((res) => sock.emit(ev, payload, (ack) => res(ack)));
-}
+let hostRoom = null;
+let packCount = 0, inspectCount = 0, resultsCount = 0;
+let xrayed = false, weighed = false, shook = false, interrogated = false, answered = false;
+let hostStarted = false;
 
 host.on('connect', async () => {
   log('host connected', host.id);
-  const r = await emitP(host, 'create_room', { name: 'Хост' });
-  hostRoom = r.roomId;
-  log('host created room', hostRoom);
-  // guest joins
-  const g = await emitP(guest, 'join_room', { roomId: hostRoom, name: 'Гость' });
-  log('guest join ack', g);
+  const r = await ep(host, 'create_room', { name: 'Хост' });
+  hostRoom = r.roomId; log('room', hostRoom);
+  await new Promise(res => { if (guest.connected) res(); else guest.once('connect', res); });
+  const g = await ep(guest, 'join_room', { roomId: hostRoom, name: 'Гость' });
+  log('guest joined', g);
 });
+guest.on('connect', () => log('guest connected'));
 
-guest.on('lobby_state', (st) => {
-  log('lobby_state guest', st.guestName);
-});
-host.on('lobby_state', (st) => {
-  log('lobby_state host', st.guestName);
-  if (st.guestName && !hostGot.started) {
-    hostGot.started = true;
-    host.emit('start_game');
-    log('host -> start_game');
-  }
-});
+function onLobby(s, st) {
+  if (st.guestName && !hostStarted) { hostStarted = true; host.emit('start_game'); log('start_game'); }
+}
+host.on('lobby_state', st => onLobby('host', st));
+guest.on('lobby_state', st => log('guest lobby', st.guestName));
 
-// фаза укладки: кто контрабандист — шлёт плейсмент
-function handleHide(sock, who, payload) {
-  log(`${who} phase_hide (role=${payload.role}) round ${payload.round}`);
-  hideCount++;
-  if (payload.role === 'contrabandist') {
-    // отправим идеальный плейсмент (совпадение 100%)
-    const cav = payload.cavity;
-    sock.emit('hide_item', { dx: cav.dx, dy: cav.dy, rot: cav.rot });
-    log(`${who} -> hide_item (perfect placement)`);
+function onPack(s, who, p) {
+  log(`${who} phase_pack role=${p.role} round${p.round} contra=${p.contraband.id}`);
+  packCount++;
+  if (p.role === 'contrabandist') {
+    // выбрать слот с ближайшим весом
+    let best = 0, bd = 99;
+    p.fillers.forEach((f, i) => { const d = Math.abs(f.weight - p.contraband.weight); if (d < bd) { bd = d; best = i; } });
+    s.emit('pack_item', { slot: best, dx: 0, dy: 0, rot: 0.2 });
+    log(`${who} pack slot=${best}`);
   }
 }
-host.on('phase_hide', (p) => handleHide(host, 'host', p));
-guest.on('phase_hide', (p) => handleHide(guest, 'guest', p));
-host.on('phase_hide_wait', () => log('host hide_wait'));
-guest.on('phase_hide_wait', () => log('guest hide_wait'));
+host.on('phase_pack', p => onPack(host, 'host', p));
+guest.on('phase_pack', p => onPack(guest, 'guest', p));
+host.on('phase_pack_wait', () => log('host pack_wait'));
+guest.on('phase_pack_wait', () => log('guest pack_wait'));
 
-function handleScan(sock, who, payload) {
-  log(`${who} phase_scan (role=${payload.role}) round ${payload.round} active=${payload.active}`);
-  scanCount++;
+function onInspect(s, who, p) {
+  log(`${who} phase_inspect role=${p.role} active=${p.active} round${p.round}`);
+  inspectCount++;
+  if (p.role === 'customs') {
+    setTimeout(() => s.emit('inspect_xray'), 80);
+    setTimeout(() => s.emit('inspect_weigh'), 200);
+    setTimeout(() => s.emit('inspect_shake'), 320);
+    setTimeout(() => s.emit('inspect_interrogate', { slot: 0 }), 440);
+    // изымаем сразу слот 0 (может быть неверным — но поток проверяем)
+    setTimeout(() => s.emit('inspect_seize', { slot: 0 }), 1300);
+  }
 }
-host.on('phase_scan', handleScan.bind(null, host, 'host'));
-guest.on('phase_scan', handleScan.bind(null, guest, 'guest'));
+host.on('phase_inspect', p => onInspect(host, 'host', p));
+guest.on('phase_inspect', p => onInspect(guest, 'guest', p));
+host.on('inspect_layout', p => log('host inspect_layout', p.layout.length));
+guest.on('inspect_layout', p => log('guest inspect_layout', p.layout.length));
+host.on('xray_result', p => { xrayed = true; log('host xray', p.usesLeft); });
+guest.on('xray_result', p => { xrayed = true; log('guest xray', p.usesLeft); });
+host.on('weigh_result', p => { weighed = true; log('host weigh', p); });
+guest.on('weigh_result', p => { weighed = true; log('guest weigh', p); });
+host.on('shake_result', p => { shook = true; log('host shake', p.usesLeft); });
+guest.on('shake_result', p => { shook = true; log('guest shake', p.usesLeft); });
+host.on('interrogate_pending', p => log('host interrogate_pending', p));
+guest.on('interrogate_pending', p => log('guest interrogate_pending', p));
+host.on('interrogate_request', p => { interrogated = true; log('host interrogate_request', p); host.emit('interrogate_answer', { textId: 'calm' }); });
+guest.on('interrogate_request', p => { interrogated = true; log('guest interrogate_request', p); guest.emit('interrogate_answer', { textId: 'calm' }); });
+host.on('interrogate_result', p => { answered = true; log('host interrogate_result', p); });
+guest.on('interrogate_result', p => { answered = true; log('guest interrogate_result', p); });
+host.on('inspect_action', p => log('host inspect_action', p));
+guest.on('inspect_action', p => log('guest inspect_action', p));
 
-// Запоминаем, кто таможенник в текущем раунде и найден ли уже hit
-let customsSock = null, scanHit = false, scanTryIdx = 0;
-
-function driveCustoms(sock, s) {
-  customsSock = sock;
-  scanHit = false;
-  scanTryIdx = 0;
-  log('customs will try to seize (round ' + (s.round) + ')');
-  // Перебираем предметы по одному с интервалом, пока не попадём в контрабанду.
-  const tryNext = () => {
-    if (scanHit || !customsSock) return;
-    const n = (lastScanItemsCount) || 5;
-    if (scanTryIdx >= n) return; // не нашли за весь проход — ждём таймаут фазы
-    log(`customs -> scan_item index=${scanTryIdx}`);
-    customsSock.emit('scan_item', { index: scanTryIdx });
-    scanTryIdx++;
-    setTimeout(tryNext, 400);
-  };
-  setTimeout(tryNext, 200);
-}
-let lastScanItemsCount = 5;
-host.on('phase_scan', (p) => { lastScanItemsCount = p.scanItems.length; if (p.active) driveCustoms(host, p); });
-guest.on('phase_scan', (p) => { lastScanItemsCount = p.scanItems.length; if (p.active) driveCustoms(guest, p); });
-
-host.on('scan_scene', (s) => log('host scan_scene match=', s.match.toFixed(2), 'contraband=', s.contrabandItemId));
-guest.on('scan_scene', (s) => log('guest scan_scene match=', s.match.toFixed(2)));
-
-function onFeedback(who, d) {
-  log(`${who} scan_feedback`, d);
-  if (d.result === 'hit') { scanHit = true; customsSock = null; }
-}
-host.on('scan_feedback', (d) => onFeedback('host', d));
-guest.on('scan_feedback', (d) => onFeedback('guest', d));
-
-function handleResult(who, r) {
+function onResult(who, r) {
   resultsCount++;
-  log(`${who} round_result round ${r.round} contraΔ=${r.contrabandistDelta} customsΔ=${r.customsDelta} seized=${r.contrabandSeized} match=${r.match.toFixed(2)} scores=`, r.scores);
+  log(`${who} round_result round${r.round} reason=${r.reason} seized=${r.contrabandSeized} contraPos=${r.contrabandPos} scores`, r.scores);
 }
-host.on('round_result', (r) => handleResult('host', r));
-guest.on('round_result', (r) => handleResult('guest', r));
+host.on('round_result', r => onResult('host', r));
+guest.on('round_result', r => onResult('guest', r));
 
-function handleGameOver(who, d) {
-  log(`${who} game_over winner=${d.winner} scores=`, d.scores);
-  if (who === 'host') {
-    setTimeout(() => {
-      log('=== ИТОГ ТЕСТА ===');
-      log('hide phases:', hideCount, '(ожид. 3)');
-      log('scan phases:', scanCount, '(ожид. 6, по 2 на раунд)');
-      log('round results:', resultsCount, '(ожид. 6, по 2 на раунд)');
-      const ok = hideCount === 3 && scanCount === 6 && resultsCount === 6;
-      log(ok ? 'PASS ✅' : 'FAIL ❌');
-      process.exit(ok ? 0 : 1);
-    }, 500);
-  }
-}
-host.on('game_over', (d) => handleGameOver('host', d));
-guest.on('game_over', (d) => handleGameOver('guest', d));
+host.on('game_over', d => {
+  log('host game_over winner', d.winner, 'scores', d.scores);
+  log('=== ИТОГ === pack:', packCount, 'inspect:', inspectCount, 'results:', resultsCount,
+    'xray:', xrayed, 'weigh:', weighed, 'shake:', shook, 'interrog:', interrogated, 'answered:', answered);
+  const ok = packCount === 3 && inspectCount === 6 && resultsCount === 6 && xrayed && weighed && shook && interrogated && answered;
+  log(ok ? 'PASS ✅' : 'FAIL ❌');
+  process.exit(ok ? 0 : 1);
+});
+guest.on('game_over', d => log('guest game_over', d.winner));
 
-host.on('opponent_left', (d) => log('host opponent_left', d.message));
-guest.on('opponent_left', (d) => log('guest opponent_left', d.message));
-host.on('error_msg', (d) => log('host error', d));
-guest.on('error_msg', (d) => log('guest error', d));
+host.on('error_msg', d => log('host err', d));
+guest.on('error_msg', d => log('guest err', d));
+host.on('opponent_left', d => log('host opponent_left', d.message));
+guest.on('opponent_left', d => log('guest opponent_left', d.message));
 
-// страховка по таймауту (3 раунда: ~3*(hide+scan+result); таймеры короткие в тесте не ускоряем)
-setTimeout(() => { log('TIMEOUT — игра не завершилась за 120с'); process.exit(2); }, 120000);
+setTimeout(() => { log('TIMEOUT — игра не завершилась за 60с'); process.exit(2); }, 60000);
